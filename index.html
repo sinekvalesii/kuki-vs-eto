@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>KUKİ: Eto'ya Karşı</title>
+<meta name="description" content="Islık çalarak uç, engelleri aş ve Şaşı Sultan Eto'yu kahve fırlatarak yen!">
+<meta name="theme-color" content="#1a1320">
+<meta property="og:title" content="KUKİ: Eto'ya Karşı">
+<meta property="og:description" content="Islık çalarak uç, engelleri aş ve Şaşı Sultan Eto'yu kahve fırlatarak yen!">
+<meta property="og:type" content="website">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="stage">
+  <canvas id="game"></canvas>
+
+  <!-- HUD -->
+  <div id="hud" class="hidden">
+    <div id="score">0</div>
+    <div id="progress">
+      <span class="lbl">ETO'YA</span>
+      <div class="track"><div class="fill"></div></div>
+      <canvas id="etoIcon" width="72" height="72"></canvas>
+    </div>
+    <div id="bossbar" class="hidden">
+      <div class="bname">ETO <small>Şaşı Sultan</small></div>
+      <div class="track"><div class="fill"></div></div>
+    </div>
+    <div id="hearts" class="hidden"></div>
+    <div class="hud-btns">
+      <button id="btnMute" class="icon-btn" aria-label="Sesi aç/kapat"></button>
+      <button id="btnPause" class="icon-btn" aria-label="Duraklat">
+        <svg viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div id="hint" class="hidden"><div class="finger">👆</div><span id="hintText">DOKUN &amp; UÇ</span></div>
+
+  <div id="banner" class="hidden">
+    <div class="warn">⚠ BOSS ⚠</div>
+    <div class="bt">ETO</div>
+    <div class="bs">Şaşı Sultan geliyor!</div>
+  </div>
+
+  <!-- DESTEK ULTİSİ -->
+  <div id="support" class="hidden">
+    <div class="sup-title" id="supUlt">DESTEK GELDİ!</div>
+    <div class="sup-row">
+      <div class="sup"><canvas data-who="yavuz" width="120" height="120"></canvas><span>YAVUZ</span></div>
+      <div class="sup"><canvas data-who="efe" width="120" height="120"></canvas><span>EFE</span></div>
+      <div class="sup"><canvas data-who="sirac" width="120" height="120"></canvas><span>SIRAÇ</span></div>
+    </div>
+  </div>
+
+  <!-- MENÜ -->
+  <section id="scr-menu" class="screen">
+    <div class="logo">
+      <div class="logo-main">KUKİ</div>
+      <div class="logo-sub">ETO'YA KARŞI</div>
+    </div>
+    <div class="spacer"></div>
+    <button class="btn primary big" id="btnPlay">OYNA</button>
+    <div class="best">EN İYİ SKOR: <b id="bestMenu">0</b></div>
+    <div class="howto">Dokun / Boşluk: <b>Uç</b> · Boss'ta her dokunuş: <b>Laf fırlat</b></div>
+    <div class="ver">v1.0 · Kuki Studios</div>
+  </section>
+
+  <!-- KARAKTER SEÇİMİ -->
+  <section id="scr-select" class="screen dim hidden">
+    <h2>KARAKTERİNİ SEÇ</h2>
+    <div class="card hero selected" data-id="kuki">
+      <div class="portrait"><canvas data-who="kuki" width="240" height="240"></canvas></div>
+      <div class="info">
+        <div class="cname">KUKİ</div>
+        <div class="ctag">Islıkçı Kahve Ustası</div>
+        <div class="stat"><span>Zıplama</span><i style="--v:.8"></i></div>
+        <div class="stat"><span>Laf Sokma</span><i style="--v:1"></i></div>
+        <div class="stat"><span>Islık</span><i style="--v:1"></i></div>
+        <div class="badge">✔ SEÇİLDİ</div>
+      </div>
+    </div>
+    <div class="soon-title">YAKINDA GELECEK</div>
+    <div class="cards">
+      <div class="card locked" data-id="yavuz">
+        <div class="portrait"><canvas data-who="yavuz" width="200" height="200"></canvas><div class="lock">🔒</div></div>
+        <div class="cname">YAVUZ</div><div class="soon">YAKINDA</div>
+      </div>
+      <div class="card locked" data-id="sirac">
+        <div class="portrait"><canvas data-who="sirac" width="200" height="200"></canvas><div class="lock">🔒</div></div>
+        <div class="cname">SIRAÇ</div><div class="soon">YAKINDA</div>
+      </div>
+      <div class="card locked" data-id="efe">
+        <div class="portrait"><canvas data-who="efe" width="200" height="200"></canvas><div class="lock">🔒</div></div>
+        <div class="cname">EFE</div><div class="soon">YAKINDA</div>
+      </div>
+      <div class="card locked" data-id="selcuk">
+        <div class="portrait"><canvas data-who="selcuk" width="200" height="200"></canvas><div class="lock">🔒</div></div>
+        <div class="cname">M. SELÇUK</div><div class="soon">YAKINDA</div>
+      </div>
+    </div>
+    <div class="row">
+      <button class="btn ghost" id="btnBack">◀ GERİ</button>
+      <button class="btn primary" id="btnStart">BAŞLA ▶</button>
+    </div>
+  </section>
+
+  <!-- DURAKLAT -->
+  <section id="scr-pause" class="screen dim center hidden">
+    <div class="panel">
+      <h2>DURAKLATILDI</h2>
+      <button class="btn primary" id="btnResume">DEVAM ▶</button>
+      <button class="btn ghost" id="btnPauseMenu">ANA MENÜ</button>
+    </div>
+  </section>
+
+  <!-- OYUN BİTTİ -->
+  <section id="scr-over" class="screen dim center hidden">
+    <div class="panel">
+      <h2 id="overTitle">OYUN BİTTİ</h2>
+      <div class="quote" id="overQuote"></div>
+      <div class="scores">
+        <div><small>SKOR</small><b id="overScore">0</b></div>
+        <div><small>EN İYİ</small><b id="overBest">0</b></div>
+      </div>
+      <div class="newbest hidden" id="overNew">YENİ REKOR!</div>
+      <button class="btn primary" id="btnRetry">TEKRAR ↻</button>
+      <button class="btn ghost" id="btnOverMenu">ANA MENÜ</button>
+    </div>
+  </section>
+
+  <!-- KAZANDIN -->
+  <section id="scr-win" class="screen dim center hidden">
+    <div class="panel win">
+      <div class="trophy">🏆</div>
+      <h2>KUKİ KAZANDI!</h2>
+      <div class="quote">“Bu daha bitmedi Kuki…” — Eto</div>
+      <div class="scores">
+        <div><small>SKOR</small><b id="winScore">0</b></div>
+        <div><small>EN İYİ</small><b id="winBest">0</b></div>
+      </div>
+      <div class="newbest hidden" id="winNew">YENİ REKOR!</div>
+      <button class="btn primary" id="btnWinRetry">TEKRAR OYNA ↻</button>
+      <button class="btn ghost" id="btnWinMenu">ANA MENÜ</button>
+    </div>
+  </section>
+
+  <div id="toast"></div>
+</div>
+<script src="game.js"></script>
+</body>
+</html>
