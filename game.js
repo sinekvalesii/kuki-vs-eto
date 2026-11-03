@@ -618,7 +618,28 @@ function drawGuyHead(c, g, o = {}) {
   if (g.style === 'swoop') {
     c.beginPath(); c.moveTo(-50, -60); c.lineTo(50, -60); c.lineTo(50, -22); c.quadraticCurveTo(10, -36, -20, -20); c.quadraticCurveTo(-40, -16, -50, -10); c.closePath(); c.fill();
   } else c.fillRect(-50, -60, 100, 32 + (g.hairLen || 0));
-  if (g.beard) { c.beginPath(); c.moveTo(-42, -6); c.quadraticCurveTo(-40, 40, 0, 42); c.quadraticCurveTo(40, 40, 42, -6); c.quadraticCurveTo(30, 18, 0, 22); c.quadraticCurveTo(-30, 18, -42, -6); c.fill(); }
+  if (g.streaks) {
+    // kır saç: açık ve koyu teller
+    c.lineWidth = 2.5; c.lineCap = 'round';
+    for (let i = 0; i < 14; i++) {
+      c.strokeStyle = i % 3 ? '#f2efea' : '#6e6964';
+      const sx = -42 + i * 6.5, sy = -50 + (i % 4) * 5;
+      c.beginPath(); c.moveTo(sx, sy); c.lineTo(sx + 5, sy + 12); c.stroke();
+    }
+    c.lineCap = 'butt';
+  }
+  if (g.stubble) {
+    // kirli sakal: yarı saydam gölge + noktalar
+    c.beginPath(); c.moveTo(-44, -10); c.quadraticCurveTo(-42, 42, 0, 44); c.quadraticCurveTo(42, 42, 44, -10); c.quadraticCurveTo(30, 6, 0, 8); c.quadraticCurveTo(-30, 6, -44, -10);
+    c.fillStyle = 'rgba(30,22,22,.32)'; c.fill();
+    c.fillStyle = 'rgba(20,14,14,.55)';
+    for (let i = 0; i < 46; i++) { const a = 0.25 + (i / 46) * 2.65, rr2 = 26 + (i * 7 % 12); c.fillRect(Math.cos(a) * rr2 - 1, -4 + Math.sin(a) * rr2 - 1, 2, 2); }
+  }
+  if (g.beard === 'short') {
+    // kısa, bakımlı genç sakalı
+    c.beginPath(); c.moveTo(-41, -4); c.quadraticCurveTo(-36, 38, 0, 40); c.quadraticCurveTo(36, 38, 41, -4);
+    c.lineTo(34, -4); c.quadraticCurveTo(26, 22, 0, 28); c.quadraticCurveTo(-26, 22, -34, -4); c.closePath(); c.fill();
+  } else if (g.beard) { c.beginPath(); c.moveTo(-42, -6); c.quadraticCurveTo(-40, 40, 0, 42); c.quadraticCurveTo(40, 40, 42, -6); c.quadraticCurveTo(30, 18, 0, 22); c.quadraticCurveTo(-30, 18, -42, -6); c.fill(); }
   c.restore();
   if (g.curly) for (let i = 0; i < 9; i++) { circle(c, -40 + i * 10, -38 - Math.abs(Math.sin(i * 1.3)) * 8, 10); c.fillStyle = g.hair; c.fill(); }
   if (g.style === 'swoop') { c.beginPath(); c.moveTo(-34, -42); c.quadraticCurveTo(8, -70, 46, -28); c.quadraticCurveTo(8, -48, -34, -42); c.fillStyle = g.hair; c.fill(); }
@@ -656,9 +677,9 @@ function drawGuy(c, cfg) {
   c.restore();
 }
 const GUYS = {
-  yavuz:  { skin: '#e8b48f', hair: '#4a2e1c', shirt: '#2a9d8f', sleeve: '#1d6f66', glasses: true },
-  sirac:  { skin: '#d49a6f', hair: '#141010', shirt: '#e76f51', sleeve: '#a94a33', curly: true, mustache: true },
-  efe:    { skin: '#f0c19c', hair: '#b8862b', shirt: '#6c5ce7', sleeve: '#4a3db3', style: 'swoop' },
+  yavuz:  { skin: '#e8b48f', hair: '#a8a39e', shirt: '#2a9d8f', sleeve: '#1d6f66', streaks: true },
+  sirac:  { skin: '#d49a6f', hair: '#141010', shirt: '#e76f51', sleeve: '#a94a33', curly: true, stubble: true },
+  efe:    { skin: '#f0c19c', hair: '#181313', shirt: '#6c5ce7', sleeve: '#4a3db3', style: 'swoop', beard: 'short' },
   selcuk: { skin: '#e2a982', hair: '#2a2420', shirt: '#d42a2a', sleeve: '#a81d1d', beard: true, glasses: true },
 };
 
