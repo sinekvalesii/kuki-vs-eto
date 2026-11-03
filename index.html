@@ -53,9 +53,9 @@
   <div id="support" class="hidden">
     <div class="sup-title" id="supUlt">DESTEK GELDİ!</div>
     <div class="sup-row">
-      <div class="sup"><canvas data-who="yavuz" width="120" height="120"></canvas><span>YAVUZ</span></div>
-      <div class="sup"><canvas data-who="efe" width="120" height="120"></canvas><span>EFE</span></div>
-      <div class="sup"><canvas data-who="sirac" width="120" height="120"></canvas><span>SIRAÇ</span></div>
+      <div class="sup"><canvas data-who="efe" data-mode="head" width="120" height="120"></canvas><span>EFE</span></div>
+      <div class="sup"><canvas data-who="sirac" data-mode="head" width="120" height="120"></canvas><span>SIRAÇ</span></div>
+      <div class="sup"><canvas data-who="yavuz" data-mode="head" width="120" height="120"></canvas><span>YAVUZ</span></div>
     </div>
   </div>
 
@@ -68,42 +68,31 @@
     <div class="spacer"></div>
     <button class="btn primary big" id="btnPlay">OYNA</button>
     <div class="best">EN İYİ SKOR: <b id="bestMenu">0</b></div>
-    <div class="howto">Dokun / Boşluk: <b>Uç</b> · Boss'ta her dokunuş: <b>Laf fırlat</b></div>
+    <div class="howto">Dokun / Boşluk: <b>Uç</b> · Boss'ta her dokunuş: <b>Özel saldırı</b></div>
     <div class="ver">v1.0 · Kuki Studios</div>
   </section>
 
   <!-- KARAKTER SEÇİMİ -->
   <section id="scr-select" class="screen dim hidden">
     <h2>KARAKTERİNİ SEÇ</h2>
-    <div class="card hero selected" data-id="kuki">
-      <div class="portrait"><canvas data-who="kuki" width="240" height="240"></canvas></div>
-      <div class="info">
-        <div class="cname">KUKİ</div>
-        <div class="ctag">Islıkçı Kahve Ustası</div>
-        <div class="stat"><span>Zıplama</span><i style="--v:.8"></i></div>
-        <div class="stat"><span>Laf Sokma</span><i style="--v:1"></i></div>
-        <div class="stat"><span>Islık</span><i style="--v:1"></i></div>
-        <div class="badge">✔ SEÇİLDİ</div>
-      </div>
+    <div class="chars">
+      <div class="card pick" data-id="mustafa"><div class="portrait"><canvas data-who="mustafa" width="160" height="160"></canvas></div><div class="pinfo"><div class="cname">MUSTAFA</div><div class="cab">Laf Fırlatma</div></div></div>
+      <div class="card pick" data-id="efe"><div class="portrait"><canvas data-who="efe" width="160" height="160"></canvas></div><div class="pinfo"><div class="cname">EFE</div><div class="cab">Dil Darbesi</div></div></div>
+      <div class="card pick" data-id="sirac"><div class="portrait"><canvas data-who="sirac" width="160" height="160"></canvas></div><div class="pinfo"><div class="cname">SIRAÇ</div><div class="cab">Kıtlama Şeker</div></div></div>
+      <div class="card pick" data-id="yavuz"><div class="portrait"><canvas data-who="yavuz" width="160" height="160"></canvas></div><div class="pinfo"><div class="cname">YAVUZ</div><div class="cab">Kukileme</div></div></div>
     </div>
-    <div class="soon-title">YAKINDA GELECEK</div>
-    <div class="cards">
-      <div class="card locked" data-id="yavuz">
-        <div class="portrait"><canvas data-who="yavuz" width="200" height="200"></canvas><div class="lock">🔒</div></div>
-        <div class="cname">YAVUZ</div><div class="soon">YAKINDA</div>
-      </div>
-      <div class="card locked" data-id="sirac">
-        <div class="portrait"><canvas data-who="sirac" width="200" height="200"></canvas><div class="lock">🔒</div></div>
-        <div class="cname">SIRAÇ</div><div class="soon">YAKINDA</div>
-      </div>
-      <div class="card locked" data-id="efe">
-        <div class="portrait"><canvas data-who="efe" width="200" height="200"></canvas><div class="lock">🔒</div></div>
-        <div class="cname">EFE</div><div class="soon">YAKINDA</div>
-      </div>
-      <div class="card locked" data-id="selcuk">
-        <div class="portrait"><canvas data-who="selcuk" width="200" height="200"></canvas><div class="lock">🔒</div></div>
-        <div class="cname">M. SELÇUK</div><div class="soon">YAKINDA</div>
-      </div>
+    <div class="detail">
+      <div class="dname" id="dName"></div>
+      <div class="dab" id="dAbility"></div>
+      <div class="ddesc" id="dDesc"></div>
+    </div>
+    <div class="card locked soonstrip" data-id="selcuk">
+      <canvas data-who="selcuk" width="80" height="80"></canvas>
+      <div class="cname">M. SELÇUK</div><div class="soon">YAKINDA</div><span class="lk">🔒</span>
+    </div>
+    <div class="levels">
+      <button class="lvl" data-lv="1"><b>BÖLÜM 1</b><small>Kantin</small></button>
+      <button class="lvl" data-lv="2"><b>BÖLÜM 2</b><small>Mağara</small><i>🔒 Bölüm 1'i bitir</i></button>
     </div>
     <div class="row">
       <button class="btn ghost" id="btnBack">◀ GERİ</button>
@@ -139,14 +128,16 @@
   <section id="scr-win" class="screen dim center hidden">
     <div class="panel win">
       <div class="trophy">🏆</div>
-      <h2>KUKİ KAZANDI!</h2>
-      <div class="quote">“Bu daha bitmedi Kuki…” — Eto</div>
+      <h2 id="winTitle">KAZANDIN!</h2>
+      <div class="quote" id="winQuote"></div>
       <div class="scores">
         <div><small>SKOR</small><b id="winScore">0</b></div>
         <div><small>EN İYİ</small><b id="winBest">0</b></div>
       </div>
       <div class="newbest hidden" id="winNew">YENİ REKOR!</div>
-      <button class="btn primary" id="btnWinRetry">TEKRAR OYNA ↻</button>
+      <button class="btn primary" id="btnNext">BÖLÜM 2 ▶</button>
+      <div class="soonnote hidden" id="winSoon">Bölüm 3 yakında… 👀</div>
+      <button class="btn ghost" id="btnWinRetry">TEKRAR OYNA ↻</button>
       <button class="btn ghost" id="btnWinMenu">ANA MENÜ</button>
     </div>
   </section>

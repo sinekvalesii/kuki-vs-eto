@@ -1,4 +1,4 @@
-/* KUKİ: Eto'ya Karşı — v1.0 */
+/* KUKİ: Eto'ya Karşı — v2.0 */
 'use strict';
 (() => {
 
@@ -7,10 +7,15 @@
 // ============================================================
 const W = 480, H = 800, GROUND = 712;
 const KUKI_X = 120;
-const BOSS_AT = 12;          // kaç engel sonra boss gelir
 const GRAVITY = 1500, FLAP = -440, MAX_FALL = 720;
-const ETO_HP = 80;
 const KUKI_HP = 5;
+const KUKILE_AT = 8;   // Yavuz: kaç isabette Eto kukilenir
+const LEVELS = {
+  1: { title: 'BÖLÜM 1', name: 'Kantin', obstacles: 12, speed: 165, gap0: 210, gapMin: 168, hp: 80, boss: 'ETO', sub: 'Şaşı Sultan', cave: false, music: 'main', bossSub: 'Şaşı Sultan geliyor!' },
+  2: { title: 'BÖLÜM 2', name: 'Mağara', obstacles: 15, speed: 182, gap0: 205, gapMin: 160, hp: 110, boss: 'MAĞARA ETO', sub: 'Uga Buga Sultan', cave: true, music: 'cave', bossSub: 'Eto mağarasından çıktı!' },
+};
+let LV = 1, L = LEVELS[1];
+let CH = 'mustafa';
 const ULT_AT = 0.55, ULT_DMG = 14;   // destek ultisi: tek sefer, Eto'nun canı %55'e inince
 const INK = '#1a1320';
 
@@ -58,6 +63,12 @@ const SONGS = {
     bass: [45,45,57,45, 45,45,57,45,  41,41,53,41, 41,41,53,41,  43,43,55,43, 43,43,55,43,  40,40,52,40, 44,44,56,44],
     drums: true, kickEvery: 2,
   },
+  cave: {
+    bpm: 118, leadType: 'triangle', leadVol: 0.5,
+    lead: [69,_,72,_, 74,_,72,69,  67,_,69,_, _,_,_,_,  69,_,72,74, 76,_,74,72,  74,_,72,_, 69,_,_,_],
+    bass: [45,_,45,_, 45,_,52,_,  43,_,43,_, 43,_,50,_,  41,_,41,_, 41,_,48,_,  40,_,40,_, 45,_,_,_],
+    drums: true, kickEvery: 2,
+  },
 };
 
 const Sound = {
@@ -96,7 +107,7 @@ const Sound = {
       try { if (this.whistleSrc) this.whistleSrc.stop(); } catch (e) {}
       const s = this.ctx.createBufferSource();
       s.buffer = this.whistleBuf;
-      s.playbackRate.value = rand(0.93, 1.08);
+      s.playbackRate.value = rand(0.93, 1.08) * (CHARS[CH] ? CHARS[CH].pitch : 1);
       const g = this.ctx.createGain(); g.gain.value = 1.6;
       s.connect(g); g.connect(this.master);
       s.start();
@@ -135,6 +146,10 @@ const Sound = {
   sfxClick() { this.tone(660, 0.06, 'square', 0.12); },
   sfxSupport() { [67, 72, 76, 79, 84].forEach((m, i) => this.tone(NOTE(m), 0.18, 'triangle', 0.3, null, i * 0.09)); },
   sfxUlt() { this.tone(140, 0.9, 'sawtooth', 0.25, 1800); this.noise(0.9, 0.12, 2000); },
+  sfxSlurp() { this.tone(900, 0.14, 'square', 0.12, 180); this.noise(0.08, 0.25, 3000, 0.06); },
+  sfxCrunch() { this.noise(0.06, 0.2, 4000); this.noise(0.05, 0.15, 5000, 0.05); },
+  sfxKuki() { [76, 79, 84, 88].forEach((m, i) => this.tone(NOTE(m), 0.12, 'square', 0.2, null, i * 0.07)); },
+  sfxRumble() { this.tone(70, 0.6, 'sawtooth', 0.35, 40); this.noise(0.5, 0.25, 100); },
   // mağara adamı homurtusu
   grunt(n = 1) {
     if (!this.ctx) return;
@@ -237,6 +252,8 @@ function drawCup(c, x, y, s = 1, rot = 0) {
 
 function drawKuki(c, x, y, o = {}) {
   const t = o.t || 0;
+  const gc = o.who && o.who !== 'mustafa' ? GUYS[o.who] : null;
+  const vest = gc ? gc.shirt : '#d42a2a', vest2 = gc ? gc.sleeve : '#a81d1d', sweat = gc ? gc.sleeve : '#1b2135', skin = gc ? gc.skin : '#e3a57c';
   c.save(); c.translate(x, y); c.rotate(o.rot || 0);
   const sq = o.squash || 0; c.scale((o.size || 1) * (1 + sq * 0.2), (o.size || 1) * (1 - sq * 0.2));
   const wing = o.wing != null ? o.wing : Math.sin(t * 6) * 0.25;
@@ -249,30 +266,37 @@ function drawKuki(c, x, y, o = {}) {
   fillStroke(c, '#ece8de', 2);
 
   // gövde: kırmızı polar yelek + lacivert sweat
-  c.beginPath(); c.ellipse(0, 16, 19, 17, 0, 0, Math.PI * 2); fillStroke(c, '#1b2135', 2);
+  c.beginPath(); c.ellipse(0, 16, 19, 17, 0, 0, Math.PI * 2); fillStroke(c, sweat, 2);
   c.save(); c.beginPath(); c.ellipse(0, 16, 19, 17, 0, 0, Math.PI * 2); c.clip();
-  c.fillStyle = '#d42a2a'; c.fillRect(-14, -4, 26, 40);
-  c.fillStyle = '#a81d1d'; c.fillRect(5, 0, 1.8, 36);           // fermuar
+  c.fillStyle = vest; c.fillRect(-14, -4, 26, 40);
+  c.fillStyle = vest2; c.fillRect(5, 0, 1.8, 36);           // fermuar
   c.fillStyle = 'rgba(255,255,255,.15)'; c.fillRect(-12, 4, 5, 28);
   c.restore();
   // yaka (dik polar yaka)
-  c.beginPath(); c.moveTo(-8, 0); c.lineTo(-4, -6); c.lineTo(4, 2); c.closePath(); fillStroke(c, '#d42a2a', 1.6);
-  c.beginPath(); c.moveTo(14, 0); c.lineTo(10, -6); c.lineTo(4, 2); c.closePath(); fillStroke(c, '#c42424', 1.6);
+  c.beginPath(); c.moveTo(-8, 0); c.lineTo(-4, -6); c.lineTo(4, 2); c.closePath(); fillStroke(c, vest, 1.6);
+  c.beginPath(); c.moveTo(14, 0); c.lineTo(10, -6); c.lineTo(4, 2); c.closePath(); fillStroke(c, vest, 1.6);
 
   // ön kol (reflektörlü)
   c.lineCap = 'round';
   c.strokeStyle = INK; c.lineWidth = 11; c.beginPath(); c.moveTo(2, 10); c.lineTo(22, 20); c.stroke();
-  c.strokeStyle = '#1b2135'; c.lineWidth = 7.5; c.beginPath(); c.moveTo(2, 10); c.lineTo(22, 20); c.stroke();
-  c.strokeStyle = '#b9c2cc'; c.lineWidth = 7.5; c.beginPath(); c.moveTo(9, 13.5); c.lineTo(13, 15.5); c.stroke();
+  c.strokeStyle = sweat; c.lineWidth = 7.5; c.beginPath(); c.moveTo(2, 10); c.lineTo(22, 20); c.stroke();
+  if (!gc) { c.strokeStyle = '#b9c2cc'; c.lineWidth = 7.5; c.beginPath(); c.moveTo(9, 13.5); c.lineTo(13, 15.5); c.stroke(); }
   c.lineCap = 'butt';
   // el + kahve
-  if (o.cup !== false) drawCup(c, 28, 12, 0.85, 0.1);
-  circle(c, 24, 19, 4.6); fillStroke(c, '#e3a57c', 1.6);
+  if (!gc && o.cup !== false) drawCup(c, 28, 12, 0.85, 0.1);
+  else if (o.who === 'sirac') drawSugar(c, 28, 13, 0.75, 0.3);
+  circle(c, 24, 19, 4.6); fillStroke(c, skin, 1.6);
 
   // ön kanat
   drawWing(c, -8, 8, wing, '#f6f3ec');
 
   // ---- KAFA ----
+  if (gc) { c.save(); c.translate(4, -16); c.scale(0.45, 0.45); c.translate(0, 6); drawGuyHead(c, gc, o); c.restore(); }
+  else drawKukiHead(c, o, t);
+  c.restore();
+}
+
+function drawKukiHead(c, o = {}, t = 0) {
   const hx = 4, hy = -16;
   circle(c, hx - 14, hy + 2, 5); fillStroke(c, '#d9966d', 1.8);      // kulak
   circle(c, hx, hy, 18); fillStroke(c, '#e3a57c', 2);
@@ -325,7 +349,6 @@ function drawKuki(c, x, y, o = {}) {
   // burun
   c.beginPath(); c.moveTo(hx + 16, hy - 1); c.quadraticCurveTo(hx + 23, hy + 3, hx + 18, hy + 5); fillStroke(c, '#e3a57c', 1.6);
   if (o.hurt) { c.fillStyle = 'rgba(255,60,60,.35)'; circle(c, hx, hy, 18); c.fill(); }
-  c.restore();
 }
 
 // ---------- ETO (boss) ----------
@@ -348,8 +371,9 @@ function drawEto(c, x, y, o = {}) {
   const s = o.size || 0.9; c.scale(s, s);
   if (o.hit > 0) c.translate(Math.sin(t * 90) * 5, 0);
 
-  // ---- uçan kantin sandalyesi ----
-  if (!o.noChair) {
+  // ---- uçan kantin sandalyesi / uçan kaya ----
+  if (!o.noChair && o.cave) drawRockSeat(c, t);
+  else if (!o.noChair) {
     const fl = 14 + Math.sin(t * 40) * 6;
     [-40, 40].forEach(lx => {
       c.beginPath(); c.moveTo(lx - 9, 214); c.quadraticCurveTo(lx, 214 + fl * 2.2, lx + 9, 214); c.closePath();
@@ -365,7 +389,8 @@ function drawEto(c, x, y, o = {}) {
     rr(c, 50, 70, 18, 96, 8); fillStroke(c, '#f26b2a', 2.5);   // sırtlık
   }
 
-  // ---- gövde: modern lacivert ceket, açık yakalı gömlek ----
+  // ---- gövde: modern lacivert ceket, açık yakalı gömlek (mağarada post) ----
+  if (o.cave) drawPelt(c); else {
   c.beginPath(); c.moveTo(-58, 66); c.quadraticCurveTo(0, 44, 58, 66); c.lineTo(66, 160); c.lineTo(-66, 160); c.closePath();
   fillStroke(c, '#37405a', 2.5);
   c.beginPath(); c.moveTo(-18, 56); c.lineTo(0, 110); c.lineTo(18, 56); c.closePath(); fillStroke(c, '#f2f2ee', 2);
@@ -375,22 +400,24 @@ function drawEto(c, x, y, o = {}) {
   c.beginPath(); c.moveTo(-20, 58); c.lineTo(-4, 120); c.lineTo(-10, 160); c.moveTo(20, 58); c.lineTo(4, 120); c.lineTo(10, 160); c.stroke();
   circle(c, 0, 132, 3); c.fillStyle = '#1b2033'; c.fill();
   circle(c, 0, 148, 3); c.fill();
+  }
 
   // ---- kollar ----
   const th = o.throwA || 0; // 0 dinlenme, 1 fırlatma
   // arka kol (dizde)
   c.lineCap = 'round';
   c.strokeStyle = INK; c.lineWidth = 22; c.beginPath(); c.moveTo(48, 76); c.lineTo(42, 140); c.stroke();
-  c.strokeStyle = '#2f3750'; c.lineWidth = 17; c.beginPath(); c.moveTo(48, 76); c.lineTo(42, 140); c.stroke();
+  c.strokeStyle = o.cave ? '#dba07a' : '#2f3750'; c.lineWidth = 17; c.beginPath(); c.moveTo(48, 76); c.lineTo(42, 140); c.stroke();
   circle(c, 40, 146, 9); fillStroke(c, '#dba07a', 2);
   // ön kol (atış yapan)
   const hx = -64 - th * 22, hy = 136 - th * 120;
   const ex = -66 - th * 6, ey = 104 - th * 46;
   c.strokeStyle = INK; c.lineWidth = 22; c.beginPath(); c.moveTo(-48, 76); c.lineTo(ex, ey); c.lineTo(hx, hy); c.stroke();
-  c.strokeStyle = '#37405a'; c.lineWidth = 17; c.beginPath(); c.moveTo(-48, 76); c.lineTo(ex, ey); c.lineTo(hx, hy); c.stroke();
+  c.strokeStyle = o.cave ? '#dba07a' : '#37405a'; c.lineWidth = 17; c.beginPath(); c.moveTo(-48, 76); c.lineTo(ex, ey); c.lineTo(hx, hy); c.stroke();
   c.lineCap = 'butt';
   circle(c, hx, hy, 10); fillStroke(c, '#dba07a', 2);
-  if (o.holding) drawSlipper(c, hx - 4, hy - 10, 0.9, -0.6 - th);
+  if (o.holding) { if (o.cave) drawRock(c, hx - 4, hy - 14, 1.3, th); else drawSlipper(c, hx - 4, hy - 10, 0.9, -0.6 - th); }
+  else if (o.cave) drawClub(c, hx, hy, th);
 
   // ---- boyun ----
   rr(c, -16, 34, 32, 26, 6); fillStroke(c, '#c98d68', 2);
@@ -406,6 +433,7 @@ function drawEto(c, x, y, o = {}) {
   c.fillStyle = '#8f8a85'; c.fill();
   c.save(); c.clip(); strands(c, ETO_HAIR, 1.8); c.restore();
   c.restore();
+  if (o.cave) drawBone(c, 10, -60, 0.9, -0.35);
   // saç tutamı üstte
   c.beginPath(); c.moveTo(-14, -54); c.quadraticCurveTo(-4, -70 + Math.sin(t * 5) * 3, 8, -58); c.quadraticCurveTo(0, -60, -14, -54); fillStroke(c, '#a19c96', 1.8);
 
@@ -504,6 +532,60 @@ function drawSlipper(c, x, y, s = 1, rot = 0) {
   c.restore();
 }
 
+function drawRock(c, x, y, s = 1, rot = 0) {
+  c.save(); c.translate(x, y); c.rotate(rot); c.scale(s, s);
+  c.beginPath(); c.moveTo(-12, -4); c.lineTo(-6, -12); c.lineTo(6, -11); c.lineTo(13, -2); c.lineTo(9, 9); c.lineTo(-4, 12); c.lineTo(-12, 6); c.closePath();
+  fillStroke(c, '#8a7d72', 2 / s);
+  c.fillStyle = 'rgba(255,255,255,.18)'; c.beginPath(); c.moveTo(-6, -8); c.lineTo(4, -8); c.lineTo(-2, -2); c.closePath(); c.fill();
+  c.restore();
+}
+function drawBone(c, x, y, s = 1, rot = 0) {
+  c.save(); c.translate(x, y); c.rotate(rot); c.scale(s, s);
+  c.fillStyle = '#f3ecdc'; c.strokeStyle = INK; c.lineWidth = 2;
+  [[-16, -4], [-16, 4], [16, -4], [16, 4]].forEach(([bx, by]) => { circle(c, bx, by, 5); c.fill(); c.stroke(); });
+  c.fillRect(-16, -3.5, 32, 7); c.beginPath(); c.moveTo(-14, -3.5); c.lineTo(14, -3.5); c.moveTo(-14, 3.5); c.lineTo(14, 3.5); c.stroke();
+  c.restore();
+}
+function drawClub(c, hx, hy, th) {
+  c.save(); c.translate(hx, hy); c.rotate(-0.5 - th * 0.8);
+  c.beginPath(); c.moveTo(-5, 10); c.lineTo(-13, -62); c.quadraticCurveTo(0, -86, 13, -62); c.lineTo(5, 10); c.closePath();
+  fillStroke(c, '#8b5a2b', 2.5);
+  c.fillStyle = '#6b4220'; circle(c, -4, -50, 3); c.fill(); circle(c, 5, -64, 2.5); c.fill(); circle(c, 2, -30, 2); c.fill();
+  c.restore();
+}
+function drawRockSeat(c, t) {
+  const fl = 14 + Math.sin(t * 40) * 6;
+  [-40, 40].forEach(lx => {
+    c.beginPath(); c.moveTo(lx - 10, 200); c.quadraticCurveTo(lx, 200 + fl * 2.4, lx + 10, 200); c.closePath(); c.fillStyle = '#ff7a2a'; c.fill();
+    c.beginPath(); c.moveTo(lx - 5, 200); c.quadraticCurveTo(lx, 200 + fl * 1.3, lx + 5, 200); c.closePath(); c.fillStyle = '#ffe27a'; c.fill();
+  });
+  c.beginPath(); c.moveTo(-84, 162); c.lineTo(-60, 148); c.lineTo(-10, 152); c.lineTo(58, 146); c.lineTo(86, 164); c.lineTo(72, 202); c.lineTo(-20, 210); c.lineTo(-70, 200); c.closePath();
+  fillStroke(c, '#7a6a5e', 3);
+  c.strokeStyle = 'rgba(0,0,0,.3)'; c.lineWidth = 2;
+  c.beginPath(); c.moveTo(-40, 160); c.lineTo(-30, 180); c.lineTo(-38, 196); c.moveTo(30, 156); c.lineTo(40, 176); c.stroke();
+  c.fillStyle = '#5f8a3a'; circle(c, -56, 154, 6); c.fill(); circle(c, 52, 150, 5); c.fill();
+}
+const PELT_SPOTS = [[-40, 80], [-18, 100], [10, 84], [34, 104], [-30, 128], [2, 126], [36, 140], [-50, 148], [20, 152], [46, 76]];
+function drawPelt(c) {
+  c.beginPath(); c.moveTo(-58, 66); c.quadraticCurveTo(0, 44, 58, 66); c.lineTo(66, 160); c.lineTo(-66, 160); c.closePath();
+  fillStroke(c, '#e0a84a', 2.5);
+  c.save(); c.clip();
+  c.fillStyle = '#7a4a1c';
+  PELT_SPOTS.forEach(([sx, sy], i) => { c.beginPath(); c.ellipse(sx, sy, 7 + (i % 3), 5, i, 0, Math.PI * 2); c.fill(); });
+  c.restore();
+  // çıplak omuz
+  c.beginPath(); c.moveTo(-58, 66); c.quadraticCurveTo(-30, 50, -4, 54); c.lineTo(-44, 104); c.closePath(); fillStroke(c, '#dba07a', 2);
+  // tırtıklı etek
+  c.beginPath(); c.moveTo(-66, 160); for (let i = 0; i <= 11; i++) c.lineTo(-66 + i * 12, i % 2 ? 170 : 160); c.closePath(); fillStroke(c, '#e0a84a', 2);
+}
+function drawSugar(c, x, y, s = 1, rot = 0) {
+  c.save(); c.translate(x, y); c.rotate(rot); c.scale(s, s);
+  rr(c, -8, -8, 16, 16, 3); fillStroke(c, '#ffffff', 2);
+  c.fillStyle = '#dcd6cc'; [[-4, -3], [3, -5], [0, 2], [-3, 5], [5, 4]].forEach(([a, b]) => c.fillRect(a, b, 2, 2));
+  c.fillStyle = 'rgba(255,255,255,.9)'; c.fillRect(-6, -6, 4, 2);
+  c.restore();
+}
+
 function drawWord(c, x, y, text, bg, fg, rot = 0, size = 17) {
   c.save(); c.translate(x, y); c.rotate(rot);
   c.font = `${size}px "Lilita One", sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle';
@@ -526,49 +608,134 @@ function drawTea(c, x, y, t) {
   c.restore();
 }
 
-// ---------- Yakında gelecek karakterler (bulanık) ----------
+// ---------- Diğer karakterler ----------
+function drawGuyHead(c, g, o = {}) {
+  const t = o.t || 0;
+  circle(c, -40, -2, 9); fillStroke(c, g.skin, 3); circle(c, 40, -2, 9); fillStroke(c, g.skin, 3);
+  circle(c, 0, -6, 40); fillStroke(c, g.skin, 3);
+  c.save(); circle(c, 0, -6, 41); c.clip();
+  c.fillStyle = g.hair;
+  if (g.style === 'swoop') {
+    c.beginPath(); c.moveTo(-50, -60); c.lineTo(50, -60); c.lineTo(50, -22); c.quadraticCurveTo(10, -36, -20, -20); c.quadraticCurveTo(-40, -16, -50, -10); c.closePath(); c.fill();
+  } else c.fillRect(-50, -60, 100, 32 + (g.hairLen || 0));
+  if (g.beard) { c.beginPath(); c.moveTo(-42, -6); c.quadraticCurveTo(-40, 40, 0, 42); c.quadraticCurveTo(40, 40, 42, -6); c.quadraticCurveTo(30, 18, 0, 22); c.quadraticCurveTo(-30, 18, -42, -6); c.fill(); }
+  c.restore();
+  if (g.curly) for (let i = 0; i < 9; i++) { circle(c, -40 + i * 10, -38 - Math.abs(Math.sin(i * 1.3)) * 8, 10); c.fillStyle = g.hair; c.fill(); }
+  if (g.style === 'swoop') { c.beginPath(); c.moveTo(-34, -42); c.quadraticCurveTo(8, -70, 46, -28); c.quadraticCurveTo(8, -48, -34, -42); c.fillStyle = g.hair; c.fill(); }
+  // kaşlar
+  c.strokeStyle = g.hair; c.lineWidth = 5; c.lineCap = 'round';
+  c.beginPath(); c.moveTo(-24, -22); c.lineTo(-9, -25); c.moveTo(9, -25); c.lineTo(24, -22); c.stroke();
+  c.lineCap = 'butt';
+  // gözler
+  if (o.dead) {
+    c.strokeStyle = INK; c.lineWidth = 4;
+    [[-15, -8], [15, -8]].forEach(([ex, ey]) => { c.beginPath(); c.moveTo(ex - 6, ey - 6); c.lineTo(ex + 6, ey + 6); c.moveTo(ex + 6, ey - 6); c.lineTo(ex - 6, ey + 6); c.stroke(); });
+  } else if ((t % 3.1) > 3.0) {
+    c.strokeStyle = INK; c.lineWidth = 3; c.beginPath(); c.moveTo(-22, -8); c.lineTo(-8, -8); c.moveTo(8, -8); c.lineTo(22, -8); c.stroke();
+  } else {
+    const big = o.scared ? 1.3 : 1;
+    circle(c, -15, -8, 7.5 * big); fillStroke(c, '#fff', 2.5); circle(c, 15, -8, 7.5 * big); fillStroke(c, '#fff', 2.5);
+    circle(c, -13, -8, 3.6); c.fillStyle = INK; c.fill(); circle(c, 17, -8, 3.6); c.fill();
+  }
+  if (g.glasses) { c.strokeStyle = INK; c.lineWidth = 3; circle(c, -15, -8, 12); c.stroke(); circle(c, 15, -8, 12); c.stroke(); c.beginPath(); c.moveTo(-3, -8); c.lineTo(3, -8); c.stroke(); }
+  // burun
+  c.strokeStyle = 'rgba(0,0,0,.35)'; c.lineWidth = 3; c.beginPath(); c.moveTo(2, -4); c.quadraticCurveTo(9, 6, 1, 9); c.stroke();
+  if (g.mustache) { c.fillStyle = g.hair; c.beginPath(); c.ellipse(0, 15, 15, 4.5, 0, 0, Math.PI * 2); c.fill(); }
+  // ağız
+  if (o.tongue) { c.beginPath(); c.ellipse(0, 22, 9, 8, 0, 0, Math.PI * 2); fillStroke(c, '#5a1f22', 2.5); circle(c, 0, 25, 5); c.fillStyle = '#ff7aa2'; c.fill(); }
+  else if (o.dead) { c.strokeStyle = INK; c.lineWidth = 3; c.beginPath(); c.arc(0, 28, 7, Math.PI + 0.3, -0.3); c.stroke(); }
+  else { c.strokeStyle = INK; c.lineWidth = 3; c.beginPath(); c.arc(0, 18, o.happy ? 10 : 8, 0.25, Math.PI - 0.25); c.stroke(); }
+  c.fillStyle = 'rgba(255,90,90,.22)'; circle(c, -25, 8, 6); c.fill(); circle(c, 25, 8, 6); c.fill();
+  if (o.hurt) { c.fillStyle = 'rgba(255,60,60,.35)'; circle(c, 0, -6, 40); c.fill(); }
+}
 function drawGuy(c, cfg) {
   c.save();
   c.beginPath(); c.ellipse(0, 70, 58, 40, 0, 0, Math.PI * 2); fillStroke(c, cfg.shirt, 3);
   rr(c, -12, 20, 24, 24, 6); fillStroke(c, cfg.skin, 3);
-  circle(c, 0, -6, 40); fillStroke(c, cfg.skin, 3);
-  c.save(); circle(c, 0, -6, 41); c.clip();
-  c.fillStyle = cfg.hair; c.fillRect(-50, -60, 100, 34 + (cfg.hairLen || 0));
-  if (cfg.beard) { c.fillStyle = cfg.hair; c.beginPath(); c.ellipse(0, 26, 40, 22, 0, 0, Math.PI * 2); c.fill(); }
-  c.restore();
-  if (cfg.curly) for (let i = 0; i < 8; i++) { circle(c, -36 + i * 10, -40 + Math.sin(i) * 4, 9); c.fillStyle = cfg.hair; c.fill(); }
-  circle(c, -14, -6, 6); fillStroke(c, '#fff', 2); circle(c, 14, -6, 6); fillStroke(c, '#fff', 2);
-  circle(c, -13, -5, 3); c.fillStyle = INK; c.fill(); circle(c, 15, -5, 3); c.fill();
-  if (cfg.glasses) { c.strokeStyle = INK; c.lineWidth = 3; circle(c, -14, -6, 11); c.stroke(); circle(c, 14, -6, 11); c.stroke(); c.beginPath(); c.moveTo(-3, -6); c.lineTo(3, -6); c.stroke(); }
-  if (cfg.mustache) { c.fillStyle = cfg.hair; c.beginPath(); c.ellipse(0, 14, 14, 4, 0, 0, Math.PI * 2); c.fill(); }
-  c.strokeStyle = INK; c.lineWidth = 3; c.beginPath(); c.arc(0, 18, 9, 0.2, Math.PI - 0.2); c.stroke();
+  drawGuyHead(c, cfg, { happy: true });
   c.restore();
 }
 const GUYS = {
-  yavuz: { skin: '#e8b48f', hair: '#4a2e1c', shirt: '#2a9d8f', glasses: true },
-  sirac: { skin: '#d49a6f', hair: '#141010', shirt: '#e76f51', curly: true, mustache: true },
-  efe:   { skin: '#f0c19c', hair: '#b8862b', shirt: '#6c5ce7', hairLen: 6, beard: false },
-  selcuk: { skin: '#e2a982', hair: '#2a2420', shirt: '#d42a2a', beard: true, glasses: true },
+  yavuz:  { skin: '#e8b48f', hair: '#4a2e1c', shirt: '#2a9d8f', sleeve: '#1d6f66', glasses: true },
+  sirac:  { skin: '#d49a6f', hair: '#141010', shirt: '#e76f51', sleeve: '#a94a33', curly: true, mustache: true },
+  efe:    { skin: '#f0c19c', hair: '#b8862b', shirt: '#6c5ce7', sleeve: '#4a3db3', style: 'swoop' },
+  selcuk: { skin: '#e2a982', hair: '#2a2420', shirt: '#d42a2a', sleeve: '#a81d1d', beard: true, glasses: true },
 };
 
+function renderPortrait(cv) {
+  const c = cv.getContext('2d'), who = cv.dataset.who, mode = cv.dataset.mode;
+  c.clearRect(0, 0, cv.width, cv.height); c.save();
+  if (mode === 'head') {
+    const sc = cv.width / 50;
+    c.translate(cv.width / 2, cv.height / 2 + 2 * sc); c.scale(sc, sc);
+    if (who === 'mustafa') { c.translate(-4, 16); drawKukiHead(c, { t: 0.5, happy: true }, 0.5); }
+    else { c.scale(0.45, 0.45); c.translate(0, 6); drawGuyHead(c, GUYS[who], { happy: true }); }
+  } else if (CHARS[who]) {
+    c.translate(cv.width * 0.5, cv.height * 0.64); c.scale(cv.width / 100, cv.width / 100);
+    drawKuki(c, 0, 0, { t: 0.5, wing: 0.35, happy: true, who });
+  } else { c.translate(cv.width / 2, cv.height * 0.5); c.scale(cv.width / 180, cv.width / 180); drawGuy(c, GUYS[who]); }
+  c.restore();
+}
 function renderPortraits() {
-  document.querySelectorAll('canvas[data-who]').forEach(cv => {
-    const c = cv.getContext('2d'), who = cv.dataset.who;
-    c.clearRect(0, 0, cv.width, cv.height);
-    c.save();
-    if (who === 'kuki') { c.translate(cv.width * 0.5, cv.height * 0.66); c.scale(cv.width / 100, cv.width / 100); drawKuki(c, 0, 0, { t: 0.5, wing: 0.35, happy: true }); }
-    else { c.translate(cv.width / 2, cv.height * 0.5); c.scale(cv.width / 180, cv.width / 180); drawGuy(c, GUYS[who]); }
-    c.restore();
-  });
+  document.querySelectorAll('canvas[data-who]').forEach(renderPortrait);
   const ic = $('#etoIcon'), ic2 = ic.getContext('2d');
   ic2.clearRect(0, 0, 72, 72); ic2.save(); ic2.beginPath(); ic2.arc(36, 36, 36, 0, Math.PI * 2); ic2.clip();
-  drawEto(ic2, 40, 34, { size: 0.5, t: 0, noChair: true }); ic2.restore();
+  drawEto(ic2, 40, 34, { size: 0.5, t: 0, noChair: true, cave: L.cave }); ic2.restore();
 }
 
 // ============================================================
 //  Arka plan (kantin / fabrika salonu)
 // ============================================================
+function drawCave(c, scroll) {
+  const g = c.createLinearGradient(0, 0, 0, GROUND);
+  g.addColorStop(0, '#1e1622'); g.addColorStop(0.5, '#3a2a30'); g.addColorStop(1, '#4a3528');
+  c.fillStyle = g; c.fillRect(0, 0, W, GROUND);
+  const P = 520, off = -((scroll * 0.15) % P);
+  for (let k = -1; k < 3; k++) {
+    const ox = off + k * P;
+    c.fillStyle = '#2c2128';
+    c.beginPath(); c.moveTo(ox, GROUND);
+    [[0, 520], [60, 430], [120, 470], [190, 380], [260, 440], [330, 400], [400, 480], [460, 420], [520, 520]].forEach(([px, py]) => c.lineTo(ox + px, py));
+    c.lineTo(ox + P, GROUND); c.closePath(); c.fill();
+    // mağara resmi: sopalı, uzun burunlu adam
+    c.save(); c.strokeStyle = 'rgba(214,140,70,.5)'; c.fillStyle = 'rgba(214,140,70,.5)'; c.lineWidth = 4; c.lineCap = 'round';
+    const px = ox + 180, py = 220;
+    circle(c, px, py, 16); c.stroke();
+    c.beginPath(); c.moveTo(px - 14, py); c.lineTo(px - 36, py + 12); c.lineTo(px - 14, py + 8); c.stroke();
+    c.beginPath(); c.moveTo(px, py + 16); c.lineTo(px, py + 60); c.moveTo(px, py + 30); c.lineTo(px - 22, py + 44); c.moveTo(px, py + 30); c.lineTo(px + 22, py + 20); c.lineTo(px + 30, py - 12);
+    c.moveTo(px, py + 60); c.lineTo(px - 14, py + 86); c.moveTo(px, py + 60); c.lineTo(px + 14, py + 86); c.stroke();
+    c.font = '26px "Lilita One", sans-serif'; c.fillText('ETO', px - 24, py - 28);
+    for (let i = 0; i < 3; i++) { circle(c, ox + 330 + i * 26, 250 + (i % 2) * 16, 8); c.fill(); }
+    c.restore();
+  }
+  c.fillStyle = '#241a20'; c.fillRect(0, 0, W, 40);
+  const P2 = 300, off2 = -((scroll * 0.35) % P2);
+  for (let k = -1; k < 3; k++) {
+    const ox = off2 + k * P2;
+    [[20, 70], [70, 40], [120, 110], [180, 55], [240, 90]].forEach(([dx, len]) => { c.beginPath(); c.moveTo(ox + dx - 16, 38); c.lineTo(ox + dx, 38 + len); c.lineTo(ox + dx + 16, 38); c.closePath(); c.fill(); });
+  }
+  const P3 = 360, off3 = -((scroll * 0.5) % P3);
+  for (let k = -1; k < 3; k++) {
+    const tx = off3 + k * P3 + 200, ty = 330, fl = Math.sin(G.t * 18 + k) * 3;
+    const rg = c.createRadialGradient(tx, ty - 20, 5, tx, ty - 20, 120);
+    rg.addColorStop(0, 'rgba(255,170,60,.45)'); rg.addColorStop(1, 'rgba(255,170,60,0)');
+    c.fillStyle = rg; c.fillRect(tx - 120, ty - 140, 240, 240);
+    c.fillStyle = '#5a3a22'; c.fillRect(tx - 4, ty - 10, 8, 40);
+    c.beginPath(); c.moveTo(tx - 9, ty - 10); c.quadraticCurveTo(tx + fl, ty - 50, tx + 9, ty - 10); c.closePath(); c.fillStyle = '#ff9a2a'; c.fill();
+    c.beginPath(); c.moveTo(tx - 5, ty - 10); c.quadraticCurveTo(tx - fl, ty - 32, tx + 5, ty - 10); c.closePath(); c.fillStyle = '#ffe27a'; c.fill();
+  }
+  const P4 = 420, off4 = -((scroll * 0.6) % P4);
+  for (let k = -1; k < 3; k++) {
+    const ox = off4 + k * P4;
+    c.fillStyle = '#3d2d2a';
+    c.beginPath(); c.moveTo(ox, GROUND); c.lineTo(ox + 30, 640); c.lineTo(ox + 90, 610); c.lineTo(ox + 140, 650); c.lineTo(ox + 170, GROUND); c.closePath(); c.fill();
+    c.beginPath(); c.moveTo(ox + 250, GROUND); c.lineTo(ox + 280, 660); c.lineTo(ox + 330, 670); c.lineTo(ox + 350, GROUND); c.closePath(); c.fill();
+    drawBone(c, ox + 210, GROUND - 8, 0.8, 0.2);
+  }
+}
+
 function drawBackground(c, scroll) {
+  if (L.cave) { drawCave(c, scroll); return; }
   // duvar
   const g = c.createLinearGradient(0, 0, 0, GROUND);
   g.addColorStop(0, '#d8d1c5'); g.addColorStop(0.2, '#ece6dc'); g.addColorStop(1, '#e4ddd1');
@@ -636,6 +803,14 @@ function drawBackground(c, scroll) {
 }
 
 function drawFloor(c, scroll) {
+  if (L.cave) {
+    c.fillStyle = '#2e221d'; c.fillRect(0, GROUND, W, H - GROUND);
+    c.fillStyle = '#4a372c'; c.fillRect(0, GROUND, W, 6);
+    const sp = 90, off = -(scroll % sp);
+    c.fillStyle = '#3c2c24';
+    for (let x = off - sp; x < W + sp; x += sp) { c.beginPath(); c.ellipse(x + 30, GROUND + 30, 26, 9, 0, 0, Math.PI * 2); c.fill(); c.beginPath(); c.ellipse(x + 70, GROUND + 62, 18, 6, 0, 0, Math.PI * 2); c.fill(); }
+    return;
+  }
   const g = c.createLinearGradient(0, GROUND, 0, H);
   g.addColorStop(0, '#ece2d2'); g.addColorStop(1, '#d6c8b4');
   c.fillStyle = g; c.fillRect(0, GROUND, W, H - GROUND);
@@ -652,6 +827,21 @@ function drawFloor(c, scroll) {
 const OB_W = 76;
 function drawObstacle(c, ob) {
   const x = ob.x, top = ob.gapY - ob.gap / 2, bot = ob.gapY + ob.gap / 2;
+  if (L.cave) {
+    c.beginPath(); c.moveTo(x - 6, -10); c.lineTo(x + OB_W + 6, -10); c.lineTo(x + OB_W + 4, top - 30); c.lineTo(x + OB_W - 10, top - 12); c.lineTo(x + OB_W / 2 + 6, top - 26);
+    c.lineTo(x + OB_W / 2 - 4, top); c.lineTo(x + 14, top - 22); c.lineTo(x - 4, top - 34); c.closePath();
+    fillStroke(c, '#6b5a50', 3);
+    c.strokeStyle = 'rgba(0,0,0,.25)'; c.lineWidth = 3;
+    for (let yy = top - 70; yy > 0; yy -= 50) { c.beginPath(); c.moveTo(x + 4, yy); c.lineTo(x + OB_W - 4, yy + 8); c.stroke(); }
+    c.fillStyle = 'rgba(255,255,255,.12)'; c.fillRect(x + 8, -10, 10, Math.max(0, top - 50));
+    c.beginPath(); c.moveTo(x - 6, GROUND); c.lineTo(x - 2, bot + 34); c.lineTo(x + 12, bot + 16); c.lineTo(x + 26, bot + 26); c.lineTo(x + OB_W / 2 + 4, bot);
+    c.lineTo(x + OB_W - 14, bot + 22); c.lineTo(x + OB_W + 4, bot + 30); c.lineTo(x + OB_W + 6, GROUND); c.closePath();
+    fillStroke(c, '#7a665a', 3);
+    c.strokeStyle = 'rgba(0,0,0,.22)'; c.lineWidth = 3;
+    for (let yy = bot + 60; yy < GROUND; yy += 46) { c.beginPath(); c.moveTo(x + 2, yy + 6); c.lineTo(x + OB_W - 2, yy); c.stroke(); }
+    drawBone(c, x + OB_W / 2, bot + 52, 0.7, 0.5);
+    return;
+  }
   // üst: havalandırma kanalı + kırmızı boru
   c.fillStyle = '#a9b1b8'; c.fillRect(x, -10, OB_W, top - 8);
   c.fillStyle = '#c9d0d6'; c.fillRect(x + 6, -10, 12, top - 8);
@@ -682,7 +872,7 @@ const G = { state: 'menu', paused: false, t: 0, scroll: 0, speed: 165, score: 0,
   passed: 0, spawned: 0, spawnT: 0, obstacles: [], cups: [], shots: [], lasers: [], parts: [], pops: [],
   shake: 0, flash: 0, introT: 0, endT: 0, bossHintT: 0 };
 const K = { y: 420, vy: 0, rot: 0, flapT: 9, hp: KUKI_HP, inv: 0, squash: 0, throwCd: 0, hurtT: 0 };
-const E = { x: 640, y: 330, hp: ETO_HP, t: 0, atkT: 2, hit: 0, nose: 0, mouth: 0, say: '', sayT: 0, throwA: 0,
+const E = { x: 640, y: 330, hp: 80, max: 80, kuki: 0, t: 0, atkT: 2, hit: 0, nose: 0, mouth: 0, say: '', sayT: 0, throwA: 0,
   volley: 0, volleyT: 0, phase2: false, dead: false, vy: 0, rot: 0, tauntT: 4, lockY: null };
 
 const TAUNTS = ['Şaşı bakıyorum ama seni görüyorum!', 'Bu ay izin yok Kuki!', 'Mola bitti, işbaşı!', 'Tutanak tutacağım!', 'Fazla mesaiye kalıyorsun!', 'Kartını bastın mı sen?', 'Vardiya değişti, haberin yok mu?', 'Zam mı? Hahaha!', 'Uga buga! Çalış!', 'Raporu masama bırak!', 'Bu daha bitmedi Kuki!'];
@@ -691,14 +881,33 @@ const KUKI_WORDS = ['ZAM!', 'İZİN!', 'MOLA!', 'PRİM!', 'HAFTA SONU!', 'İKRAM
 const ETO_WORDS = ['TUTANAK!', 'FAZLA MESAİ!', 'İZİN YOK!', 'RAPOR?', 'VARDİYA!', 'KART BAS!', 'TOPLANTI!'];
 const KUKI_SAYS = ['ZAM İSTİYORUZ!', 'Hakkımı helal etmiyorum!', 'Mola hakkım bu!', 'Bugün erken çıkıyorum!', 'Al sana izin dilekçesi!'];
 const BOSS_WIN_LINES = ['“Hah! Yarın sabah 7\'de işbaşı.” — Eto', '“Islık yetmedi Kuki!” — Eto', '“Şaşıyım ama nişancıyım!” — Eto', '“Tutanağını imzala, çık.” — Eto'];
+const TAUNTS2 = ['UGA BUGA! Mağarama hoş geldin!', 'Burada zam yok, taş var!', 'Bu daha bitmedi demiştim Kuki!', 'Ateşi ben buldum, mesaiyi de!', 'Tutanağı taşa kazıdım!', 'HRRR! Kartını bas!', 'Şaşıyım ama taşım isabetli!'];
+const ETO2_WORDS = ['UGA!', 'TAŞ!', 'HRRR!', 'MESAİ!', 'TUTANAK!', 'OOGA!'];
+const CHARS = {
+  mustafa: { name: 'MUSTAFA', short: 'Kuki', tag: 'namıdiğer Kuki', ability: 'LAF FIRLATMA', pitch: 1, hint: 'DOKUN = LAF FIRLAT!',
+    desc: 'Her dokunuşta ZAM!, İZİN!, MOLA! gibi laflar fırlatır. Hızlı ve isabetli.',
+    says: KUKI_SAYS, pops: ['BONK!', 'ŞAK!', 'POF!'] },
+  efe: { name: 'EFE', short: 'Efe', tag: 'Dili Kemiksiz', ability: 'DİL DARBESİ', pitch: 1.25, hint: 'DOKUN = DİL DARBESİ!',
+    desc: 'Dilini şak diye uzatıp önündekine vurur. Gelen lafları ve terlikleri de yalayıp yok eder!',
+    says: ['Dilimin kemiği yok!', 'Şlaaap!', 'Tadın tuzun yok Eto!', 'Dil darbesi geliyor!'], pops: ['ŞLAP!', 'ŞAP!', 'LIK!'] },
+  sirac: { name: 'SIRAÇ', short: 'Sıraç', tag: 'Erzurumlu Şekerci', ability: 'KITLAMA ŞEKER', pitch: 0.82, hint: 'DOKUN = ŞEKER FIRLAT!',
+    desc: 'Erzurum kıtlama şekerini üçlü yaylım halinde fırlatır. Biri kaçsa ikisi tutar.',
+    says: ["Erzurum'dan selam olsun!", 'Kıtlama şeker, acı çay!', 'Şekerim bitmez dadaş!', 'Ağzın tatlansın Eto!'], pops: ['ÇITIR!', 'TIK!', 'KITIR!'] },
+  yavuz: { name: 'YAVUZ', short: 'Yavuz', tag: 'Baş Kukileyici', ability: 'KUKİLEME', pitch: 1.1, hint: 'DOKUN = KUKİLE!',
+    desc: 'Kuki enerjisi fırlatır. ' + KUKILE_AT + ' isabette Eto kukilenir: 4 saniye donar, ıslık çalar ve çift hasar alır.',
+    says: ['Seni de kukileyeceğim!', 'Kukilenmeye hazır mısın?', 'Herkes Kuki olacak!', 'Kuki enerjisi yükleniyor!'], pops: ['KUKİ!', 'PIUV!', 'HOP!'] },
+};
+function nick() { return CHARS[CH].short; }
+function unlocked() { return Math.max(1, +(store('kuki_unlocked') || 1)); }
 const FLY_DIE_LINES = ['Eto\'ya ulaşamadın bile! Eto uzaktan gülüyor…', 'Kantin sandalyeleri kazandı.', 'Islık güzeldi, uçuş değil.', 'Servisi kaçırdın Kuki!'];
 
 function resetGame() {
-  Object.assign(G, { t: 0, speed: 165, score: 0, passed: 0, spawned: 0, spawnT: 0.6, obstacles: [], cups: [], shots: [], lasers: [], parts: [], pops: [], shake: 0, flash: 0, introT: 0, endT: 0 });
+  Object.assign(G, { t: 0, speed: L.speed, score: 0, passed: 0, spawned: 0, spawnT: 0.6, obstacles: [], cups: [], shots: [], lasers: [], parts: [], pops: [], shake: 0, flash: 0, introT: 0, endT: 0 });
   Object.assign(K, { y: 400, vy: 0, rot: 0, flapT: 9, hp: KUKI_HP, inv: 0, squash: 0, throwCd: 0, hurtT: 0 });
-  Object.assign(E, { x: 640, y: 330, hp: ETO_HP, t: 0, atkT: 2, hit: 0, nose: 0, mouth: 0, say: '', sayT: 0, throwA: 0, volley: 0, volleyT: 0, phase2: false, dead: false, vy: 0, rot: 0, tauntT: 4, lockY: null });
+  Object.assign(E, { x: 640, y: 330, hp: L.hp, t: 0, atkT: 2, hit: 0, nose: 0, mouth: 0, say: '', sayT: 0, throwA: 0, volley: 0, volleyT: 0, phase2: false, dead: false, vy: 0, rot: 0, tauntT: 4, lockY: null });
   Object.assign(G, { ult: null, ultUsed: false, teaT: 14, teas: [], kSay: '', kSayT: 0, kSayCd: 5 });
-  E.phase3 = false; E.stun = 0;
+  E.phase3 = false; E.stun = 0; E.max = L.hp; E.kuki = 0;
+  Object.assign(G, { falls: [], tongue: null, scoreAcc: 0, kukiMeter: 0 });
   $('#support').classList.add('hidden');
 }
 
@@ -715,6 +924,7 @@ function burst(x, y, n, type, opts = {}) {
 }
 function pop(x, y, text, col = '#fff', size = 30) { G.pops.push({ x, y, text, col, size, t: 0 }); }
 function etoSay(text, dur = 2) {
+  text = text.replace(/Kuki/g, nick());
   E.say = text; E.sayT = dur; E.mouth = 1;
   if (/uga|ugh|hrr|ooga/i.test(text)) Sound.grunt(2); else if (Math.random() < 0.4) Sound.grunt(1);
 }
@@ -732,9 +942,9 @@ function goMenu() {
   $('#bestMenu').textContent = G.best;
   $('#hud').classList.add('hidden'); $('#hint').classList.add('hidden'); $('#banner').classList.add('hidden');
   show('menu');
-  Sound.playMusic('main');
+  Sound.playMusic(L.music);
 }
-function goSelect() { G.state = 'select'; show('select'); }
+function goSelect() { G.state = 'select'; refreshSelect(); show('select'); }
 function startGame() {
   resetGame();
   G.state = 'ready'; G.paused = false;
@@ -744,7 +954,9 @@ function startGame() {
   $('#progress').classList.remove('hidden'); $('#progress .fill').style.width = '0%';
   $('#bossbar').classList.add('hidden'); $('#bossbar').classList.remove('rage'); $('#hearts').classList.add('hidden');
   $('#hintText').textContent = 'DOKUN & UÇ'; $('#hint').classList.remove('hidden');
-  Sound.playMusic('main');
+  $('#progress .lbl').textContent = L.title;
+  renderPortraits();
+  Sound.playMusic(L.music);
 }
 function setPaused(p) {
   if (!['play', 'boss', 'bossIntro', 'ready'].includes(G.state)) return;
@@ -754,7 +966,7 @@ function renderHearts() {
   $('#hearts').innerHTML = Array.from({ length: KUKI_HP }, (_, i) => i).map(i => `<span class="${i < K.hp ? '' : 'lost'}">❤️</span>`).join('');
 }
 function updateBossBar() {
-  $('#bossbar .fill').style.width = Math.max(0, E.hp / ETO_HP * 100) + '%';
+  $('#bossbar .fill').style.width = Math.max(0, E.hp / E.max * 100) + '%';
   $('#bossbar').classList.toggle('rage', E.phase2);
 }
 function addScore(n) {
@@ -769,8 +981,8 @@ function saveBest() {
 function gameOver() {
   const isNew = saveBest();
   const boss = E.x < 600;
-  $('#overTitle').textContent = boss ? 'ETO KAZANDI 😏' : 'OYUN BİTTİ';
-  $('#overQuote').textContent = boss ? pick(BOSS_WIN_LINES) : pick(FLY_DIE_LINES);
+  $('#overTitle').textContent = boss ? L.boss + ' KAZANDI 😏' : 'OYUN BİTTİ';
+  $('#overQuote').textContent = (boss ? pick(BOSS_WIN_LINES) : pick(FLY_DIE_LINES)).replace(/Kuki/g, nick());
   $('#overScore').textContent = G.score; $('#overBest').textContent = G.best;
   $('#overNew').classList.toggle('hidden', !isNew);
   $('#hud').classList.add('hidden');
@@ -780,6 +992,12 @@ function victory() {
   const isNew = saveBest();
   $('#winScore').textContent = G.score; $('#winBest').textContent = G.best;
   $('#winNew').classList.toggle('hidden', !isNew);
+  const next = LEVELS[LV + 1];
+  if (next) store('kuki_unlocked', String(Math.max(LV + 1, unlocked())));
+  $('#winTitle').textContent = next ? L.title + ' TAMAM!' : 'TÜM BÖLÜMLER BİTTİ!';
+  $('#winQuote').textContent = next ? `“Bu daha bitmedi ${nick()}… Mağarada görüşürüz!” — Eto` : `“Bu daha da bitmedi ${nick()}… UGA!” — Mağara Eto`;
+  $('#btnNext').classList.toggle('hidden', !next);
+  $('#winSoon').classList.toggle('hidden', !!next);
   $('#hud').classList.add('hidden');
   show('win');
 }
@@ -794,12 +1012,37 @@ function flap() {
   K.vy = FLAP; K.flapT = 0; K.squash = 1;
   Sound.whistle();
   burst(KUKI_X - 18, K.y + 10, 2, 'feather', { dir: Math.PI * 0.75, spread: 0.5, min: 40, max: 120, col: '#ffffff', smin: 4, smax: 6 });
-  if (G.state === 'boss' && K.throwCd <= 0) throwCup();
+  if (G.state === 'boss' && K.throwCd <= 0) attack();
 }
-function throwCup() {
-  K.throwCd = 0.14;
-  G.cups.push({ x: KUKI_X + 26, y: K.y + 4, vx: 540, vy: -40, r: 0, w: pick(KUKI_WORDS) });
-  Sound.sfxThrow();
+function attack() {
+  const x0 = KUKI_X + 26, y0 = K.y + 4;
+  if (CH === 'mustafa') {
+    K.throwCd = 0.14;
+    G.cups.push({ kind: 'word', x: x0, y: y0, vx: 540, vy: -40, r: 0, w: pick(KUKI_WORDS), dmg: 1 });
+    Sound.sfxThrow();
+  } else if (CH === 'sirac') {
+    K.throwCd = 0.18;
+    [-0.16, 0, 0.16].forEach(a => G.cups.push({ kind: 'sugar', x: x0, y: y0, vx: Math.cos(a) * 520, vy: Math.sin(a) * 520 - 30, r: rand(0, 6), spin: 9, dmg: 0.38 }));
+    Sound.sfxCrunch();
+  } else if (CH === 'yavuz') {
+    K.throwCd = 0.16;
+    G.cups.push({ kind: 'kuki', x: x0, y: y0, vx: 500, vy: -30, r: 0, spin: 6, g: 60, dmg: 0.8 });
+    Sound.tone(1200, 0.08, 'triangle', 0.15, 1800);
+  } else if (CH === 'efe') {
+    K.throwCd = 0.3;
+    const mx = KUKI_X + 8, my = K.y - 6;
+    const hitE = !E.dead && E.x < 600 && Math.abs(my - (E.y + 50)) < 110;
+    const reach = hitE ? Math.max(60, E.x - 44 - mx) : 300;
+    G.tongue = { t: 0, reach };
+    for (const sh of G.shots) {
+      if (sh.x > mx && sh.x < mx + reach + 24 && Math.abs(sh.y - my) < 30) {
+        sh.dead = true; pop(sh.x, sh.y - 10, 'YALADI!', '#ff8fb1', 20);
+        burst(sh.x, sh.y, 6, 'coffee', { col: '#ff8fb1', min: 60, max: 180 });
+      }
+    }
+    Sound.sfxSlurp();
+    if (hitE) etoHit(mx + reach, my, 1.1, 'tongue');
+  }
 }
 stage.addEventListener('pointerdown', e => {
   if (e.target.closest('button, .card, .panel')) return;
@@ -835,7 +1078,30 @@ document.querySelectorAll('.card.locked').forEach(cd => cd.addEventListener('cli
   cd.classList.remove('shake'); void cd.offsetWidth; cd.classList.add('shake');
   toast(cd.querySelector('.cname').textContent + ' yakında geliyor! 🔒');
 }));
-$('.card.hero').addEventListener('dblclick', () => startGame());
+btn('#btnNext', () => { setLevel(LV + 1); startGame(); });
+function setLevel(lv) {
+  LV = lv; L = LEVELS[lv]; store('kuki_lv', lv); G.speed = L.speed;
+  refreshSelect(); renderPortraits(); Sound.playMusic(L.music);
+}
+function refreshSelect() {
+  document.querySelectorAll('.card.pick').forEach(cd => cd.classList.toggle('selected', cd.dataset.id === CH));
+  const ch = CHARS[CH];
+  $('#dName').innerHTML = `${ch.name} <small>${ch.tag}</small>`;
+  $('#dAbility').textContent = 'ÖZEL: ' + ch.ability;
+  $('#dDesc').textContent = ch.desc;
+  const un = unlocked();
+  document.querySelectorAll('.lvl').forEach(b => { const lv = +b.dataset.lv; b.classList.toggle('selected', lv === LV); b.classList.toggle('locked', lv > un); });
+}
+document.querySelectorAll('.card.pick').forEach(cd => {
+  cd.addEventListener('click', e => { e.stopPropagation(); Sound.init(); CH = cd.dataset.id; store('kuki_char', CH); Sound.whistle(); refreshSelect(); });
+  cd.addEventListener('dblclick', () => startGame());
+});
+document.querySelectorAll('.lvl').forEach(b => b.addEventListener('click', e => {
+  e.stopPropagation(); Sound.init();
+  const lv = +b.dataset.lv;
+  if (lv > unlocked()) { Sound.tone(200, 0.15, 'square', 0.15); b.classList.remove('shake'); void b.offsetWidth; b.classList.add('shake'); toast('Önce Bölüm ' + (lv - 1) + "'i bitir! 🔒"); return; }
+  Sound.sfxClick(); setLevel(lv);
+}));
 
 function updateMuteIcon() {
   $('#btnMute').innerHTML = Sound.muted
@@ -870,6 +1136,8 @@ function startBossIntro() {
   G.state = 'bossIntro'; G.introT = 0;
   E.x = 660; E.y = 330;
   $('#progress').classList.add('hidden'); $('#score').classList.add('hidden');
+  $('#banner .bt').textContent = L.boss; $('#banner .bs').textContent = L.bossSub;
+  $('#bossbar .bname').innerHTML = `${L.boss} <small>${L.sub}</small>`;
   $('#banner').classList.remove('hidden');
   Sound.stopMusic(); Sound.sfxAlarm();
   G.shake = 6;
@@ -879,41 +1147,68 @@ function startBoss() {
   $('#banner').classList.add('hidden');
   $('#bossbar').classList.remove('hidden'); $('#hearts').classList.remove('hidden');
   renderHearts(); updateBossBar();
-  $('#hintText').textContent = 'DOKUN = LAF FIRLAT!'; $('#hint').classList.remove('hidden');
+  $('#hintText').textContent = CHARS[CH].hint; $('#hint').classList.remove('hidden');
   G.bossHintT = 2.5;
   E.atkT = 1.6;
   Sound.playMusic('boss');
 }
-function etoHit(cup) {
-  E.hp--; E.hit = 0.22; E.nose = 1; G.shake = Math.max(G.shake, 4);
-  Sound.sfxBoing();
-  burst(cup.x, cup.y, 10, 'coffee', { dir: Math.PI, spread: 1.1, min: 80, max: 280, col: '#ffd23f' });
-  if (Math.random() < 0.35 && E.sayT <= 0.3) etoSay(pick(HIT_SAYS), 1.1);
-  else pop(cup.x - 10, cup.y - 20, pick(['BONK!', 'ŞAK!', 'POF!', '+1']), '#ffd23f', 26);
-  addScore(1);
+function etoHit(x, y, dmg = 1, kind = 'word') {
+  if (E.kuki > 0) dmg *= 2;
+  E.hp -= dmg; E.hit = 0.22; E.nose = 1; G.shake = Math.max(G.shake, kind === 'sugar' ? 2 : 4);
+  if (kind === 'sugar') Sound.sfxCrunch(); else Sound.sfxBoing();
+  const col = kind === 'sugar' ? '#ffffff' : kind === 'kuki' || kind === 'tongue' ? '#ff8fd1' : '#ffd23f';
+  burst(x, y, kind === 'sugar' ? 4 : 10, 'coffee', { dir: Math.PI, spread: 1.1, min: 80, max: 280, col });
+  if (Math.random() < 0.3 && E.sayT <= 0.3 && E.kuki <= 0) etoSay(pick(HIT_SAYS), 1.1);
+  else if (kind !== 'sugar' || Math.random() < 0.35) pop(x - 10, y - 20, E.kuki > 0 ? 'x2!' : pick(CHARS[CH].pops), '#ffd23f', 26);
+  G.scoreAcc += dmg; while (G.scoreAcc >= 1) { G.scoreAcc -= 1; addScore(1); }
+  if (kind === 'kuki' && E.kuki <= 0) {
+    G.kukiMeter++;
+    if (G.kukiMeter >= KUKILE_AT) { G.kukiMeter = 0; kukile(); }
+    else pop(E.x, E.y - 110, `KUKİ ${G.kukiMeter}/${KUKILE_AT}`, '#ff8fd1', 22);
+  }
   updateBossBar();
-  if (!G.ultUsed && E.hp <= ETO_HP * ULT_AT) startUlt();
-  if (!E.phase2 && E.hp <= ETO_HP / 2) {
+  if (!G.ultUsed && E.hp <= E.max * ULT_AT && E.hp > 0) startUlt();
+  if (!E.phase2 && E.hp <= E.max / 2) {
     E.phase2 = true; G.shake = 14; etoSay('Yeter! Artık ciddiyim!', 2.2);
     updateBossBar(); Sound.sfxAlarm();
   }
-  if (!E.phase3 && E.hp <= ETO_HP / 4) {
+  if (!E.phase3 && E.hp <= E.max / 4) {
     E.phase3 = true; G.shake = 16; etoSay('UGA BUGAAA! Mağara modu!', 2.4); Sound.grunt(3);
   }
   if (E.hp <= 0) {
     E.dead = true; E.vy = -420; G.state = 'won'; G.endT = 0; G.shake = 22; G.flash = 0.5;
     G.shots = []; G.lasers = []; G.cups = [];
     addScore(50);
-    etoSay('Bu daha bitmedi Kukiii…', 3); Sound.grunt(3);
+    E.kuki = 0; G.falls = []; G.tongue = null;
+    etoSay(L.cave ? 'Bu daha da bitmedi Kuki… UGAAA!' : 'Bu daha bitmedi Kuki…', 3); Sound.grunt(3);
     Sound.stopMusic(); Sound.sfxWin();
     burst(E.x, E.y, 30, 'star', { col: '#ffd23f', min: 120, max: 420, smin: 6, smax: 11 });
     $('#bossbar').classList.add('hidden');
   }
 }
 
+function kukile() {
+  E.kuki = 4; E.stun = Math.max(E.stun, 4); E.volley = 0; G.lasers = []; G.falls = [];
+  pop(W / 2 + 30, E.y - 130, 'KUKİLENDİ!', '#ff8fd1', 40); G.shake = 14; G.flash = 0.3;
+  burst(E.x, E.y, 24, 'star', { col: '#ff8fd1', min: 100, max: 360, smin: 5, smax: 10 });
+  Sound.sfxKuki(); setTimeout(() => Sound.whistle(), 200);
+  E.say = 'Fiyuuu~ 🎵 (Eto ıslık çalıyor)'; E.sayT = 2.4;
+}
+function spawnBoulders() {
+  const slots = [170, 290, 410, 530, 640].sort(() => Math.random() - 0.5);
+  const n = E.phase3 ? 3 : 2;
+  for (let i = 0; i < n; i++) G.falls.push({ x: W + 50, y: slots[i], t: 0, warn: 0.9 + i * 0.35, vx: -(E.phase2 ? 470 : 410), r: 0 });
+  E.throwA = 1; G.shake = 12; Sound.sfxRumble();
+  etoSay('SOPA DEPREMİ! UGA!', 1.4);
+}
 function startUlt() {
   G.ultUsed = true; G.ult = { t: 0, origins: [] };
-  G.shots = []; G.lasers = []; E.volley = 0;
+  G.shots = []; G.lasers = []; G.falls = []; E.volley = 0;
+  const others = Object.keys(CHARS).filter(k => k !== CH);
+  document.querySelectorAll('#support .sup').forEach((el, i) => {
+    const cv = el.querySelector('canvas'); cv.dataset.who = others[i];
+    el.querySelector('span').textContent = CHARS[others[i]].name; renderPortrait(cv);
+  });
   const el = $('#support'); el.classList.remove('hidden', 'out', 'charge'); void el.offsetWidth;
   $('#supUlt').textContent = 'DESTEK GELDİ!';
   Sound.sfxSupport();
@@ -934,7 +1229,7 @@ function updateUlt(dt) {
     u.fired = true;
     E.hp = Math.max(1, E.hp - ULT_DMG); E.hit = 0.8; E.nose = 1; E.stun = 1.8; G.shake = 24; G.flash = 0.5;
     updateBossBar(); addScore(10);
-    pop(E.x - 20, E.y - 100, '-' + ULT_DMG + ' ULTİ!', '#ffd23f', 40);
+    pop(W / 2 + 40, E.y - 100, '-' + ULT_DMG + ' ULTİ!', '#ffd23f', 40);
     burst(E.x, E.y + 20, 30, 'star', { col: '#ffd23f', min: 120, max: 420, smin: 6, smax: 11 });
     Sound.sfxBoing(); Sound.grunt(3);
     etoSay('UGHHH! Toplu dilekçe olmaz!', 2.2);
@@ -956,7 +1251,7 @@ function updateExtras(dt) {
   G.teas = G.teas.filter(tp => !tp.dead && tp.x > -40);
   // Kuki de laf sokar
   G.kSayT -= dt; G.kSayCd -= dt;
-  if (G.kSayCd <= 0 && !G.ult) { G.kSay = pick(KUKI_SAYS); G.kSayT = 1.7; G.kSayCd = rand(7, 11); }
+  if (G.kSayCd <= 0 && !G.ult) { G.kSay = pick(CHARS[CH].says); G.kSayT = 1.7; G.kSayCd = rand(7, 11); }
 }
 
 function etoHandPos() { return { x: E.x - 70 * 0.9, y: E.y + 30 }; }
@@ -967,6 +1262,7 @@ function updateEto(dt) {
   E.hit = Math.max(0, E.hit - dt);
   E.nose = Math.max(0, E.nose - dt * 1.6);
   E.throwA = Math.max(0, E.throwA - dt * 4);
+  E.kuki = Math.max(0, E.kuki - dt);
   if (E.sayT > 0) { E.sayT -= dt; E.mouth = (E.sayT > 0) ? 0.4 + Math.abs(Math.sin(E.t * 14)) * 0.6 : 0; } else E.mouth = Math.max(0, E.mouth - dt * 4);
 
   if (E.dead) {
@@ -988,7 +1284,7 @@ function updateEto(dt) {
 
   // sataşma
   E.tauntT -= dt;
-  if (E.tauntT <= 0 && E.sayT <= 0) { etoSay(pick(TAUNTS), 2); E.tauntT = rand(4, 7); }
+  if (E.tauntT <= 0 && E.sayT <= 0) { etoSay(pick(L.cave ? TAUNTS2 : TAUNTS), 2); E.tauntT = rand(4, 7); }
 
   // terlik yağmuru
   if (E.volley > 0) {
@@ -999,13 +1295,17 @@ function updateEto(dt) {
       const tx = KUKI_X, ty = K.y + rand(-50, 50);
       const sp = (E.phase2 ? 400 : 330);
       const a = Math.atan2(ty - h.y, tx - h.x);
-      G.shots.push({ x: h.x, y: h.y - 60, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 40, r: 0, vr: rand(-14, -8), w: Math.random() < 0.55 ? pick(ETO_WORDS) : null });
+      G.shots.push({ x: h.x, y: h.y - 60, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 40, r: 0, vr: rand(-14, -8), w: Math.random() < 0.5 ? pick(L.cave ? ETO2_WORDS : ETO_WORDS) : null, rock: L.cave });
       Sound.sfxSlipper();
     }
   }
   E.atkT -= dt;
-  if (E.atkT <= 0 && E.volley <= 0 && !G.lasers.length) {
-    if (Math.random() < (E.phase3 ? 0.45 : E.phase2 ? 0.38 : 0.26)) {
+  if (E.atkT <= 0 && E.volley <= 0 && !G.lasers.length && !G.falls.length) {
+    const roll = Math.random(), lp = L.cave ? (E.phase3 ? 0.36 : E.phase2 ? 0.3 : 0.22) : (E.phase3 ? 0.45 : E.phase2 ? 0.38 : 0.26);
+    if (L.cave && roll >= lp && roll < lp + 0.3) {
+      spawnBoulders();
+      E.atkT = E.phase3 ? 1.8 : E.phase2 ? 2.2 : 2.8;
+    } else if (roll < lp) {
       const cy = clamp(K.y + rand(-20, 20), 140, 640);
       G.lasers.push({ t: 0, warn: E.phase2 ? 0.75 : 0.95, fire: 0.55, cx: KUKI_X + rand(40, 120), cy });
       etoSay('ŞAŞI LAZER!', 1.4);
@@ -1042,11 +1342,11 @@ function update(dt) {
 
   if (G.state === 'play') {
     // engel üret
-    if (G.spawned < BOSS_AT) {
+    if (G.spawned < L.obstacles) {
       G.spawnT -= dt;
       if (G.spawnT <= 0) {
-        G.spawnT = 1.55;
-        const gap = Math.max(168, 210 - G.spawned * 3.5);
+        G.spawnT = 1.55 * 165 / L.speed;
+        const gap = Math.max(L.gapMin, L.gap0 - G.spawned * 3.5);
         const prev = G.obstacles.length ? G.obstacles[G.obstacles.length - 1].gapY : 400;
         const gapY = clamp(prev + rand(-190, 190), 150 + gap / 2, GROUND - 60 - gap / 2);
         G.obstacles.push({ x: W + 20, gapY, gap, scored: false });
@@ -1057,7 +1357,7 @@ function update(dt) {
       ob.x -= G.speed * dt;
       if (!ob.scored && ob.x + OB_W < KUKI_X - 10) {
         ob.scored = true; G.passed++; addScore(1); Sound.sfxScore();
-        $('#progress .fill').style.width = (G.passed / BOSS_AT * 100) + '%';
+        $('#progress .fill').style.width = (G.passed / L.obstacles * 100) + '%';
       }
       // çarpışma
       const cx = KUKI_X + 2, cy = K.y, r = 16;
@@ -1066,13 +1366,13 @@ function update(dt) {
     }
     G.obstacles = G.obstacles.filter(o => o.x > -OB_W - 30);
     if (K.y > GROUND - 22) { K.y = GROUND - 22; die(); }
-    if (G.spawned >= BOSS_AT && G.obstacles.length === 0 && G.state === 'play') startBossIntro();
+    if (G.spawned >= L.obstacles && G.obstacles.length === 0 && G.state === 'play') startBossIntro();
   }
 
   if (G.state === 'bossIntro') {
     G.introT += dt;
     K.y += (380 - K.y) * Math.min(1, dt * 2.5); K.vy = 0; K.rot = Math.sin(G.t * 3) * 0.08;
-    if (G.introT > 1.3 && !E.say) etoSay('Kuki… Seni bekliyordum!', 2);
+    if (G.introT > 1.3 && !E.say) etoSay(L.cave ? 'Bu daha bitmedi demiştim Kuki! UGA!' : 'Kuki… Seni bekliyordum!', 2.2);
     updateEto(dt);
     if (G.introT > 3.4) startBoss();
   }
@@ -1102,10 +1402,10 @@ function update(dt) {
 
   // kahve bardakları
   for (const c of G.cups) {
-    c.vy += 160 * dt; c.x += c.vx * dt; c.y += c.vy * dt; c.r += dt;
+    c.vy += (c.g != null ? c.g : 160) * dt; c.x += c.vx * dt; c.y += c.vy * dt; c.r += dt * (c.spin || 1);
     if (!E.dead && E.x < 600) {
       const dx = (c.x - E.x) / 52, dy = (c.y - (E.y + 50)) / 120;
-      if (dx * dx + dy * dy < 1) { c.dead = true; etoHit(c); if (G.state === 'won') break; }
+      if (dx * dx + dy * dy < 1) { c.dead = true; etoHit(c.x, c.y, c.dmg || 1, c.kind); if (G.state === 'won') break; }
     }
   }
   G.cups = G.cups.filter(c => !c.dead && c.x < W + 40 && c.y < H);
@@ -1117,6 +1417,15 @@ function update(dt) {
     if (G.state === 'boss' && dx * dx + dy * dy < 24 * 24) { s.dead = true; hurtKuki(); }
   }
   G.shots = G.shots.filter(s => !s.dead && s.x > -60 && s.y < H + 40 && s.y > -80);
+
+  // kaya yuvarlanması (Bölüm 2)
+  for (const b of G.falls) {
+    b.t += dt;
+    if (b.t > b.warn) { b.x += b.vx * dt; b.r -= dt * 8; }
+    if (G.state === 'boss' && b.t > b.warn && Math.hypot(b.x - KUKI_X - 2, b.y - K.y) < 40) { b.dead = true; hurtKuki(); }
+  }
+  G.falls = G.falls.filter(b => !b.dead && b.x > -60);
+  if (G.tongue) { G.tongue.t += dt; if (G.tongue.t > 0.26) G.tongue = null; }
 
   // lazer
   for (const L of G.lasers) {
@@ -1187,10 +1496,16 @@ function render() {
 
   // Eto
   if (inMenu) {
-    drawEto(c, 368, 420 + Math.sin(G.t * 1.6) * 12, { t: G.t, size: 0.8, mouth: G.state === 'menu' ? (Math.sin(G.t * 2) > 0.6 ? 0.6 : 0) : 0 });
+    drawEto(c, 368, 420 + Math.sin(G.t * 1.6) * 12, { t: G.t, size: 0.8, cave: L.cave, mouth: G.state === 'menu' ? (Math.sin(G.t * 2) > 0.6 ? 0.6 : 0) : 0 });
   } else if (E.x < 640) {
     const inLaser = G.lasers.length > 0;
-    drawEto(c, E.x, E.y, { t: E.t, size: 0.9, hit: E.hit, nose: E.nose, mouth: E.mouth, throwA: E.throwA, holding: E.volley > 0, angry: E.phase2, laser: inLaser, dizzy: E.dead || E.hit > 0.05 || E.stun > 0, rot: E.rot });
+    drawEto(c, E.x, E.y, { t: E.t, size: 0.9, hit: E.hit, nose: E.nose, mouth: E.mouth, throwA: E.throwA, holding: E.volley > 0, angry: E.phase2, laser: inLaser, dizzy: E.dead || E.hit > 0.05 || E.stun > 0, rot: E.rot, cave: L.cave });
+    if (E.kuki > 0 && !E.dead) {
+      // kukilenmiş Eto: kafası Kuki'ye dönüşür
+      c.save(); c.translate(E.x - 2, E.y - 6); c.rotate(Math.sin(E.t * 6) * 0.12); c.scale(-2.9, 2.9); c.translate(-4, 16);
+      drawKukiHead(c, { t: E.t, happy: true }, E.t); c.restore();
+      for (let i = 0; i < 3; i++) { const a = E.t * 4 + i * 2.1; drawStar(c, E.x + Math.cos(a) * 60, E.y - 60 + Math.sin(a) * 14, 7, '#ff8fd1'); }
+    }
   }
 
   // lazerler
@@ -1215,20 +1530,48 @@ function render() {
     if (!L.fired) { c.save(); c.fillStyle = 'rgba(255,40,40,.8)'; c.font = '28px "Lilita One", sans-serif'; c.textAlign = 'center'; c.fillText('✕', L.cx, L.cy + 10); c.restore(); }
   }
 
-  for (const s of G.shots) s.w ? drawWord(c, s.x, s.y, s.w, '#d42a2a', '#fff', Math.sin(s.r) * 0.25, 15) : drawSlipper(c, s.x, s.y, 1, s.r);
+  for (const s of G.shots) {
+    if (s.w) drawWord(c, s.x, s.y, s.w, L.cave ? '#7a4a1c' : '#d42a2a', '#fff', Math.sin(s.r) * 0.25, 15);
+    else if (s.rock) drawRock(c, s.x, s.y, 1.5, s.r);
+    else drawSlipper(c, s.x, s.y, 1, s.r);
+  }
+  for (const b of G.falls) {
+    if (b.t <= b.warn) {
+      if (Math.floor(G.t * 10) % 2) { c.save(); c.font = '34px "Lilita One", sans-serif'; c.textAlign = 'center'; c.lineWidth = 6; c.strokeStyle = INK; c.strokeText('◀!', W - 30, b.y + 12); c.fillStyle = '#ff4d4d'; c.fillText('◀!', W - 30, b.y + 12); c.restore(); }
+    } else drawRock(c, b.x, b.y, 2.3, b.r);
+  }
   for (const tp of G.teas) drawTea(c, tp.x, tp.y + Math.sin(tp.t * 3) * 20, tp.t);
-  for (const cp of G.cups) drawWord(c, cp.x, cp.y, cp.w, '#ffd23f', INK, Math.sin(cp.r * 12) * 0.15);
+  for (const cp of G.cups) {
+    if (cp.kind === 'sugar') drawSugar(c, cp.x, cp.y, 1, cp.r);
+    else if (cp.kind === 'kuki') {
+      circle(c, cp.x, cp.y, 15 + Math.sin(G.t * 30) * 2); c.fillStyle = 'rgba(255,143,209,.45)'; c.fill();
+      c.save(); c.translate(cp.x, cp.y); c.rotate(Math.sin(cp.r) * 0.4); c.scale(0.6, 0.6); c.translate(-4, 16); drawKukiHead(c, { t: G.t, happy: true }, G.t); c.restore();
+    } else drawWord(c, cp.x, cp.y, cp.w, '#ffd23f', INK, Math.sin(cp.r * 12) * 0.15);
+  }
 
   // Kuki
   if (inMenu) {
-    drawKuki(c, 118, 470 + Math.sin(G.t * 3) * 14, { t: G.t, size: 1.6, wing: Math.sin(G.t * 10) * 0.5, happy: true });
+    drawKuki(c, 118, 470 + Math.sin(G.t * 3) * 14, { t: G.t, size: 1.6, wing: Math.sin(G.t * 10) * 0.5, happy: true, who: CH });
   } else if (!(K.inv > 0 && Math.floor(G.t * 16) % 2 === 0)) {
     const flapping = K.flapT < 0.35;
     drawKuki(c, KUKI_X, K.y, {
       t: G.t, rot: K.rot, squash: K.squash, size: 1.15,
       wing: flapping ? Math.sin(K.flapT * 40) * 0.8 : Math.sin(G.t * 5) * 0.25,
-      dead: G.state === 'dying', hurt: K.hurtT > 0, scared: G.lasers.some(l => !l.fired), happy: G.state === 'won',
+      dead: G.state === 'dying', hurt: K.hurtT > 0, scared: G.lasers.some(l => !l.fired) || G.falls.length > 0, happy: G.state === 'won',
+      who: CH, tongue: !!G.tongue,
     });
+  }
+  // Efe'nin dil darbesi
+  if (G.tongue && !(K.inv > 0 && Math.floor(G.t * 16) % 2 === 0)) {
+    const tg = G.tongue, tt = tg.t;
+    const len = tt < 0.08 ? tg.reach * tt / 0.08 : tt < 0.14 ? tg.reach : tg.reach * Math.max(0, 1 - (tt - 0.14) / 0.12);
+    const mx = KUKI_X + 8, my = K.y - 6, ey = my + Math.sin(tt * 50) * 4;
+    c.save(); c.lineCap = 'round';
+    c.strokeStyle = INK; c.lineWidth = 16; c.beginPath(); c.moveTo(mx, my); c.lineTo(mx + len, ey); c.stroke();
+    c.strokeStyle = '#ff7aa2'; c.lineWidth = 11; c.beginPath(); c.moveTo(mx, my); c.lineTo(mx + len, ey); c.stroke();
+    c.strokeStyle = '#ffb3c8'; c.lineWidth = 2.5; c.beginPath(); c.moveTo(mx + 4, my); c.lineTo(mx + len - 6, ey); c.stroke();
+    circle(c, mx + len, ey, 9); fillStroke(c, '#ff7aa2', 2.5);
+    c.restore();
   }
 
   // parçacıklar
@@ -1288,11 +1631,14 @@ function loop(now) {
 
 // başlat
 const fontsReady = document.fonts ? Promise.race([document.fonts.ready, new Promise(r => setTimeout(r, 1500))]) : Promise.resolve();
+LV = Math.min(Math.max(1, +(store('kuki_lv') || 1)), unlocked()); L = LEVELS[LV] || LEVELS[1];
+{ const sc = store('kuki_char'); if (sc && CHARS[sc]) CH = sc; }
 fontsReady.then(() => { renderPortraits(); });
 renderPortraits();
+refreshSelect();
 goMenu();
 requestAnimationFrame(loop);
 
 // test kancası (konsoldan): KUKI_DEBUG.boss()
-window.KUKI_DEBUG = { boss() { startGame(); G.state = 'play'; G.spawned = BOSS_AT; G.obstacles = []; $('#hint').classList.add('hidden'); }, G, K, E };
+window.KUKI_DEBUG = { setLevel, pick(c) { CH = c; refreshSelect(); }, boss() { startGame(); G.state = 'play'; G.spawned = L.obstacles; G.obstacles = []; $('#hint').classList.add('hidden'); }, G, K, E };
 })();
